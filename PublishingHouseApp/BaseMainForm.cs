@@ -4,33 +4,24 @@ using System.Windows.Forms;
 
 namespace PublishingHouseApp
 {
-    /// <summary>
-    /// Базовая форма для Admin / Editor / Manager.
-    /// Содержит: шапку, боковую навигацию, контентную область.
-    /// Дочерние формы добавляют кнопки навигации и панели контента.
-    /// </summary>
     public class BaseMainForm : Form
     {
-        // ── Layout panels ─────────────────────────────────────────────────────
-        protected Panel pnlHeader;
-        protected Panel pnlNav;
-        protected Panel pnlContent;
+        protected Panel            pnlHeader;
+        protected FlowLayoutPanel  pnlNav;      // FlowLayout — порядок кнопок = порядок добавления
+        protected Panel            pnlContent;
+        protected Label            lblRoleName;
 
-        // ── Header controls ───────────────────────────────────────────────────
-        private Label lblAppTitle;
-        protected Label lblRoleName;
+        private Button    _activeNavBtn;
+        private readonly UserRole _role;
 
-        // ── Nav ───────────────────────────────────────────────────────────────
-        private Button _activeNavBtn;
-
-        protected BaseMainForm(string roleName, string windowTitle)
+        protected BaseMainForm(string roleName, string windowTitle, UserRole role)
         {
+            _role = role;
             InitializeLayout(roleName, windowTitle);
         }
 
         private void InitializeLayout(string roleName, string windowTitle)
         {
-            // ── Form ─────────────────────────────────────────────────────────
             Text            = windowTitle + " — ИС «Просвещение»";
             Size            = new Size(1200, 700);
             MinimumSize     = new Size(1000, 600);
@@ -38,7 +29,7 @@ namespace PublishingHouseApp
             BackColor       = AppColors.FormBackground;
             WindowState     = FormWindowState.Maximized;
 
-            // ── Header (top bar) ─────────────────────────────────────────────
+            // ── Header ────────────────────────────────────────────────────────
             pnlHeader = new Panel
             {
                 Dock      = DockStyle.Top,
@@ -46,7 +37,7 @@ namespace PublishingHouseApp
                 BackColor = AppColors.NavBackground
             };
 
-            lblAppTitle = new Label
+            var lblApp = new Label
             {
                 Text      = "ИС «Просвещение»",
                 Font      = new Font("Segoe UI", 13f, FontStyle.Bold),
@@ -62,9 +53,8 @@ namespace PublishingHouseApp
                 ForeColor = Color.FromArgb(189, 215, 234),
                 AutoSize  = true
             };
-            // Will be right-aligned after load
             pnlHeader.SizeChanged += (s, e) =>
-                lblRoleName.Location = new Point(pnlHeader.Width - lblRoleName.Width - 70, 18);
+                lblRoleName.Location = new Point(pnlHeader.Width - lblRoleName.Width - 90, 18);
 
             var btnLogout = new Button
             {
@@ -77,29 +67,33 @@ namespace PublishingHouseApp
                 Cursor    = Cursors.Hand
             };
             btnLogout.FlatAppearance.BorderSize = 0;
+            btnLogout.MouseEnter += (s, e) => btnLogout.BackColor = Color.FromArgb(231, 76, 60);
+            btnLogout.MouseLeave += (s, e) => btnLogout.BackColor = Color.FromArgb(192, 57, 43);
             pnlHeader.SizeChanged += (s, e) =>
-                btnLogout.Location = new Point(pnlHeader.Width - btnLogout.Width - 10, 13);
+                btnLogout.Location = new Point(pnlHeader.Width - btnLogout.Width - 12, 13);
             btnLogout.Click += (s, e) => Close();
 
-            pnlHeader.Controls.Add(lblAppTitle);
+            pnlHeader.Controls.Add(lblApp);
             pnlHeader.Controls.Add(lblRoleName);
             pnlHeader.Controls.Add(btnLogout);
 
-            // ── Side navigation ──────────────────────────────────────────────
-            pnlNav = new Panel
+            // ── Nav — FlowLayoutPanel сверху вниз, порядок = порядок добавления ──
+            pnlNav = new FlowLayoutPanel
             {
-                Dock      = DockStyle.Left,
-                Width     = 210,
-                BackColor = AppColors.NavBackground,
-                Padding   = new Padding(0, 10, 0, 0)
+                Dock          = DockStyle.Left,
+                Width         = 210,
+                BackColor     = AppColors.NavBackground,
+                FlowDirection = FlowDirection.TopDown,
+                WrapContents  = false,
+                AutoScroll    = false,
+                Padding       = new Padding(0, 8, 0, 0)
             };
 
-            // ── Content area ─────────────────────────────────────────────────
+            // ── Content ───────────────────────────────────────────────────────
             pnlContent = new Panel
             {
                 Dock      = DockStyle.Fill,
-                BackColor = AppColors.FormBackground,
-                Padding   = new Padding(20)
+                BackColor = AppColors.FormBackground
             };
 
             Controls.Add(pnlContent);
@@ -107,72 +101,60 @@ namespace PublishingHouseApp
             Controls.Add(pnlHeader);
         }
 
-        // ── Navigation button factory ─────────────────────────────────────────
+        // ── Dashboard — добавляется первым, отображается первым ───────────────
+        protected Button AddDashboardNav()
+        {
+            var dashPanel = AddContentPanel();
+            dashPanel.Controls.Add(new DashboardPanel(_role) { Dock = DockStyle.Fill });
 
-        /// <summary>
-        /// Создаёт кнопку бокового меню навигации.
-        /// При клике переключает активную панель контента.
-        /// </summary>
+            var btn = MakeNavButton("🏠  Главная", dashPanel);
+            pnlNav.Controls.Add(btn);
+            ActivatePanel(btn, dashPanel);
+            return btn;
+        }
+
+        // ── Nav button factory ────────────────────────────────────────────────
         protected Button MakeNavButton(string text, Panel targetPanel)
         {
             var btn = new Button
             {
                 Text      = "  " + text,
-                Dock      = DockStyle.Top,
+                Width     = 210,        // фиксированная ширина вместо Dock
                 Height    = 44,
                 FlatStyle = FlatStyle.Flat,
                 BackColor = AppColors.NavBackground,
                 ForeColor = AppColors.NavText,
-                Font      = new Font("Segoe UI", 10f),
+                Font      = new Font("Segoe UI", 9.5f),
                 TextAlign = ContentAlignment.MiddleLeft,
-                Cursor    = Cursors.Hand
+                Cursor    = Cursors.Hand,
+                Margin    = new Padding(0)
             };
-            btn.FlatAppearance.BorderSize      = 0;
+            btn.FlatAppearance.BorderSize         = 0;
             btn.FlatAppearance.MouseOverBackColor = AppColors.NavHover;
-
-            btn.MouseEnter += (s, e) =>
-            {
-                if (btn != _activeNavBtn) btn.BackColor = AppColors.NavHover;
-            };
-            btn.MouseLeave += (s, e) =>
-            {
-                if (btn != _activeNavBtn) btn.BackColor = AppColors.NavBackground;
-            };
-
-            btn.Click += (s, e) => ActivatePanel(btn, targetPanel);
-
+            btn.MouseEnter += (s, e) => { if (btn != _activeNavBtn) btn.BackColor = AppColors.NavHover; };
+            btn.MouseLeave += (s, e) => { if (btn != _activeNavBtn) btn.BackColor = AppColors.NavBackground; };
+            btn.Click      += (s, e) => ActivatePanel(btn, targetPanel);
             return btn;
         }
 
-        /// <summary>
-        /// Скрывает все дочерние панели pnlContent и показывает нужную,
-        /// подсвечивает активную кнопку навигации.
-        /// </summary>
         protected void ActivatePanel(Button navBtn, Panel targetPanel)
         {
-            // Hide all content panels
             foreach (Control c in pnlContent.Controls)
                 if (c is Panel p) p.Visible = false;
 
             targetPanel.Visible = true;
             targetPanel.BringToFront();
 
-            // Reset previous active button
             if (_activeNavBtn != null)
             {
                 _activeNavBtn.BackColor = AppColors.NavBackground;
-                _activeNavBtn.Font      = new Font("Segoe UI", 10f);
+                _activeNavBtn.Font      = new Font("Segoe UI", 9.5f);
             }
-
-            // Highlight new active button
             navBtn.BackColor = AppColors.NavSelected;
-            navBtn.Font      = new Font("Segoe UI", 10f, FontStyle.Bold);
+            navBtn.Font      = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             _activeNavBtn    = navBtn;
         }
 
-        /// <summary>
-        /// Добавляет панель в контентную область (скрытой по умолчанию)
-        /// </summary>
         protected Panel AddContentPanel()
         {
             var panel = new Panel

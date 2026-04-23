@@ -17,7 +17,7 @@ namespace PublishingHouseApp
     public static class AppUsers
     {
         // -------------------------------------------------------
-        // Логины и пароли
+        // Логины и пароли — меняйте здесь при необходимости
         // -------------------------------------------------------
         private const string AdminLogin    = "admin";
         private const string AdminPassword = "admin123";

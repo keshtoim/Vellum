@@ -1,8 +1,52 @@
-# Игнорировать папку Visual Studio
-.vs/
-# Игнорировать результаты сборки
+# ── Build outputs ────────────────────────────────────────────────────────
 bin/
 obj/
-# Игнорировать скрытые файлы VS
+[Dd]ebug/
+[Rr]elease/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]uild/
+
+# ── Visual Studio files ───────────────────────────────────────────────────
+.vs/
 *.user
+*.userosscache
 *.suo
+*.sln.docstates
+*.userprefs
+
+# ── NuGet ─────────────────────────────────────────────────────────────────
+packages/
+*.nupkg
+*.snupkg
+project.lock.json
+project.fragment.lock.json
+artifacts/
+
+# ── Logs and temp ─────────────────────────────────────────────────────────
+*.log
+*.tmp
+*.temp
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ── OS files ──────────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# ── Sensitive / local config ──────────────────────────────────────────────
+# App.config содержит строку подключения к LocalDB — не публикуем
+App.config
+
+# ── Reports (generated Excel files) ──────────────────────────────────────
+*.xlsx
+
+# ── SQL files — НЕ игнорируем, они нужны в репозитории ───────────────────
+# (*.sql файлы намеренно не добавлены в .gitignore)
