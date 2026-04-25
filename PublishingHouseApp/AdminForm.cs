@@ -107,7 +107,7 @@ namespace PublishingHouseApp
                     int res = eid == -1
                         ? DatabaseHelper.SmartInsert("Author", "INSERT INTO Author (surname,name,patronymic,email,phone,tax_id) VALUES (@s,@n,@p,@e,@ph,@t)", prm)
                         : DatabaseHelper.ExecuteNonQuery("UPDATE Author SET surname=@s,name=@n,patronymic=@p,email=@e,phone=@ph,tax_id=@t WHERE author_id=@id", Append(prm, new SqlParameter("@id", eid)));
-                    if (res >= 0) { sb.Refresh(); editPanel.Visible = false; }
+                    if (res >= 0) { sb.ReloadData(); editPanel.Visible = false; }
                 },
                 onCancel: () => editPanel.Visible = false);
 
@@ -129,19 +129,18 @@ namespace PublishingHouseApp
                 var r = grid.SelectedRows[0];
                 if (!UIHelper.Confirm($"Удалить автора «{r.Cells["surname"].Value} {r.Cells["name"].Value}»?")) return;
                 int res = DatabaseHelper.ExecuteNonQuery("DELETE FROM Author WHERE author_id=@id", new[] { new SqlParameter("@id", Convert.ToInt32(r.Cells["author_id"].Value)) });
-                if (res >= 0) { sb.Refresh(); editPanel.Visible = false; }
+                if (res >= 0) { sb.ReloadData(); editPanel.Visible = false; }
             };
             WireDoubleClick(grid, btnEdit);
 
-            sb.Init(grid, (kw, sc) =>
-            {
-                var dt = DatabaseHelper.ExecuteQuery(
+            sb.Init(grid,
+            (kw, sc) => DatabaseHelper.ExecuteQuery(
                     $"SELECT author_id,surname,name,patronymic,email,phone,tax_id FROM Author WHERE surname LIKE @k OR name LIKE @k OR email LIKE @k ORDER BY {sc}",
-                    new[] { new SqlParameter("@k", $"%{kw}%") });
-                HideCols(grid, "author_id");
-                SetHeaders(grid, new[] { ("surname","Фамилия"),("name","Имя"),("patronymic","Отчество"),("email","Email"),("phone","Телефон"),("tax_id","ИНН") });
-                return dt;
-            }, new[] { "Фамилия","Имя","Email" }, new[] { "surname","name","email" });
+                    new[] { new SqlParameter("@k", $"%{kw}%") }),
+            new[] { "Фамилия","Имя","Email" },
+            new[] { "surname","name","email" },
+            new[] { ("surname","Фамилия"),("name","Имя"),("patronymic","Отчество"),("email","Email"),("phone","Телефон"),("tax_id","ИНН") },
+            new[] { "author_id" });
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -189,7 +188,7 @@ namespace PublishingHouseApp
                     int res = eid == -1
                         ? DatabaseHelper.SmartInsert("Contract", "INSERT INTO Contract (signing_date,valid_until,amount,author_id) VALUES (@sd,@vu,@am,@ai)", prm)
                         : DatabaseHelper.ExecuteNonQuery("UPDATE Contract SET signing_date=@sd,valid_until=@vu,amount=@am,author_id=@ai WHERE contract_id=@id", Append(prm, new SqlParameter("@id", eid)));
-                    if (res >= 0) { sb.Refresh(); editPanel.Visible = false; }
+                    if (res >= 0) { sb.ReloadData(); editPanel.Visible = false; }
                 },
                 onCancel: () => editPanel.Visible = false);
 
@@ -210,19 +209,18 @@ namespace PublishingHouseApp
                 var r = grid.SelectedRows[0];
                 if (!UIHelper.Confirm($"Удалить договор №{r.Cells["contract_id"].Value}?")) return;
                 int res = DatabaseHelper.ExecuteNonQuery("DELETE FROM Contract WHERE contract_id=@id", new[] { new SqlParameter("@id", Convert.ToInt32(r.Cells["contract_id"].Value)) });
-                if (res >= 0) { sb.Refresh(); editPanel.Visible = false; }
+                if (res >= 0) { sb.ReloadData(); editPanel.Visible = false; }
             };
             WireDoubleClick(grid, btnEdit);
 
-            sb.Init(grid, (kw, sc) =>
-            {
-                var dt = DatabaseHelper.ExecuteQuery(
+            sb.Init(grid,
+            (kw, sc) => DatabaseHelper.ExecuteQuery(
                     $"SELECT c.contract_id,c.signing_date,c.valid_until,c.amount,a.surname+' '+a.name AS author,c.author_id FROM Contract c JOIN Author a ON a.author_id=c.author_id WHERE a.surname LIKE @k OR a.name LIKE @k ORDER BY {sc}",
-                    new[] { new SqlParameter("@k", $"%{kw}%") });
-                HideCols(grid, "contract_id","author_id");
-                SetHeaders(grid, new[] { ("signing_date","Дата подписания"),("valid_until","Действует до"),("amount","Сумма"),("author","Автор") });
-                return dt;
-            }, new[] { "Дата","Сумма","Автор" }, new[] { "c.signing_date","c.amount","a.surname" });
+                    new[] { new SqlParameter("@k", $"%{kw}%") }),
+            new[] { "Дата","Сумма","Автор" },
+            new[] { "c.signing_date","c.amount","a.surname" },
+            new[] { ("signing_date","Дата подписания"),("valid_until","Действует до"),("amount","Сумма"),("author","Автор") },
+            new[] { "contract_id","author_id" });
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -306,7 +304,7 @@ namespace PublishingHouseApp
                     int res = eid == -1
                         ? DatabaseHelper.SmartInsert("Publication", "INSERT INTO Publication (title,isbn,contract_id,type_id,subject_id,class_id) VALUES (@ti,@is,@co,@ty,@su,@cl)", prm)
                         : DatabaseHelper.ExecuteNonQuery("UPDATE Publication SET title=@ti,isbn=@is,contract_id=@co,type_id=@ty,subject_id=@su,class_id=@cl WHERE publication_id=@id", Append(prm, new SqlParameter("@id", eid)));
-                    if (res >= 0) { sb.Refresh(); editPanel.Visible = false; }
+                    if (res >= 0) { sb.ReloadData(); editPanel.Visible = false; }
                 },
                 onCancel: () => editPanel.Visible = false);
 
@@ -328,22 +326,21 @@ namespace PublishingHouseApp
                 var r = grid.SelectedRows[0];
                 if (!UIHelper.Confirm($"Удалить «{r.Cells["title"].Value}»?")) return;
                 int res = DatabaseHelper.ExecuteNonQuery("DELETE FROM Publication WHERE publication_id=@id", new[] { new SqlParameter("@id", Convert.ToInt32(r.Cells["publication_id"].Value)) });
-                if (res >= 0) { sb.Refresh(); editPanel.Visible = false; }
+                if (res >= 0) { sb.ReloadData(); editPanel.Visible = false; }
             };
             WireDoubleClick(grid, btnEdit);
 
-            sb.Init(grid, (kw, sc) =>
-            {
-                var dt = DatabaseHelper.ExecuteQuery(
+            sb.Init(grid,
+            (kw, sc) => DatabaseHelper.ExecuteQuery(
                     $"SELECT p.publication_id,p.title,p.isbn,p.contract_id,p.type_id,p.subject_id,p.class_id,t.type_name,s.subject_name,cl.class_level,a.surname+' '+a.name AS author " +
                     $"FROM Publication p LEFT JOIN Type t ON t.type_id=p.type_id LEFT JOIN Subject s ON s.subject_id=p.subject_id " +
                     $"LEFT JOIN Class cl ON cl.class_id=p.class_id LEFT JOIN Contract c ON c.contract_id=p.contract_id LEFT JOIN Author a ON a.author_id=c.author_id " +
                     $"WHERE p.title LIKE @k OR p.isbn LIKE @k OR a.surname LIKE @k ORDER BY {sc}",
-                    new[] { new SqlParameter("@k", $"%{kw}%") });
-                HideCols(grid, "publication_id","contract_id","type_id","subject_id","class_id");
-                SetHeaders(grid, new[] { ("title","Название"),("isbn","ISBN"),("type_name","Тип"),("subject_name","Тематика"),("class_level","Класс"),("author","Автор") });
-                return dt;
-            }, new[] { "Название","ISBN","Автор" }, new[] { "p.title","p.isbn","a.surname" });
+                    new[] { new SqlParameter("@k", $"%{kw}%") }),
+            new[] { "Название","ISBN","Автор" },
+            new[] { "p.title","p.isbn","a.surname" },
+            new[] { ("title","Название"), ("isbn","ISBN"), ("type_name","Тип"), ("subject_name","Тематика"), ("class_level","Класс"), ("author","Автор") },
+            new[] { "publication_id", "contract_id", "type_id", "subject_id", "class_id" });
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -377,7 +374,7 @@ namespace PublishingHouseApp
                     int pid=((ComboItem)cbPub.SelectedItem).Id;
                     var prm=new[]{new SqlParameter("@n",tbName.Text.Trim()),new SqlParameter("@d",dtpStart.Value.Date),new SqlParameter("@s",Statuses[ni]),new SqlParameter("@p",pid)};
                     int res=eid==-1?DatabaseHelper.SmartInsert("PreparationStage","INSERT INTO PreparationStage (stage_name,start_date,status,publication_id) VALUES (@n,@d,@s,@p)",prm):DatabaseHelper.ExecuteNonQuery("UPDATE PreparationStage SET stage_name=@n,start_date=@d,status=@s,publication_id=@p WHERE stage_id=@id",Append(prm,new SqlParameter("@id",eid)));
-                    if(res>=0){sb.Refresh();editPanel.Visible=false;}
+                    if(res>=0){sb.ReloadData();editPanel.Visible=false;}
                 },
                 onCancel:()=>editPanel.Visible=false);
 
@@ -387,10 +384,15 @@ namespace PublishingHouseApp
 
             btnAdd.Click+=(s,e)=>{LoadPubs();tbName.Text="";dtpStart.Value=DateTime.Today;cbStatus.SelectedIndex=0;cbPub.SelectedIndex=-1;eid=-1;prevIdx=-1;lblH.Text="Новый этап";editPanel.Visible=true;};
             btnEdit.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите этап.");return;}LoadPubs();var r=grid.SelectedRows[0];eid=Convert.ToInt32(r.Cells["stage_id"].Value);lblH.Text="Редактировать этап";tbName.Text=r.Cells["stage_name"].Value?.ToString();if(r.Cells["start_date"].Value!=DBNull.Value)dtpStart.Value=Convert.ToDateTime(r.Cells["start_date"].Value);prevIdx=Array.IndexOf(Statuses,r.Cells["status"].Value?.ToString());cbStatus.SelectedIndex=prevIdx;SelectById(cbPub,r.Cells["publication_id"].Value);editPanel.Visible=true;};
-            btnDel.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите этап.");return;}var r=grid.SelectedRows[0];if(!UIHelper.Confirm($"Удалить этап «{r.Cells["stage_name"].Value}»?"))return;int res=DatabaseHelper.ExecuteNonQuery("DELETE FROM PreparationStage WHERE stage_id=@id",new[]{new SqlParameter("@id",Convert.ToInt32(r.Cells["stage_id"].Value))});if(res>=0){sb.Refresh();editPanel.Visible=false;}};
+            btnDel.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите этап.");return;}var r=grid.SelectedRows[0];if(!UIHelper.Confirm($"Удалить этап «{r.Cells["stage_name"].Value}»?"))return;int res=DatabaseHelper.ExecuteNonQuery("DELETE FROM PreparationStage WHERE stage_id=@id",new[]{new SqlParameter("@id",Convert.ToInt32(r.Cells["stage_id"].Value))});if(res>=0){sb.ReloadData();editPanel.Visible=false;}};
             WireDoubleClick(grid,btnEdit);
 
-            sb.Init(grid,(kw,sc)=>{var dt=DatabaseHelper.ExecuteQuery($"SELECT ps.stage_id,ps.stage_name,ps.start_date,ps.status,p.title AS publication,ps.publication_id FROM PreparationStage ps JOIN Publication p ON p.publication_id=ps.publication_id WHERE ps.stage_name LIKE @k OR ps.status LIKE @k OR p.title LIKE @k ORDER BY {sc}",new[]{new SqlParameter("@k",$"%{kw}%")});HideCols(grid,"stage_id","publication_id");SetHeaders(grid,new[]{("stage_name","Название"),("start_date","Дата начала"),("status","Статус"),("publication","Издание")});return dt;},new[]{"Название","Статус","Дата"},new[]{"ps.stage_name","ps.status","ps.start_date"});
+            sb.Init(grid,
+            (kw, sc) => DatabaseHelper.ExecuteQuery($"SELECT ps.stage_id,ps.stage_name,ps.start_date,ps.status,p.title AS publication,ps.publication_id FROM PreparationStage ps JOIN Publication p ON p.publication_id=ps.publication_id WHERE ps.stage_name LIKE @k OR ps.status LIKE @k OR p.title LIKE @k ORDER BY {sc}",new[]{new SqlParameter("@k",$"%{kw}%")}),
+            new[]{"Название","Статус","Дата"},
+            new[]{"ps.stage_name","ps.status","ps.start_date"},
+            new[] { ("stage_name","Название этапа"), ("start_date","Дата начала"), ("status","Статус"), ("publication","Издание") },
+            new[] { "stage_id", "publication_id" });
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -414,15 +416,20 @@ namespace PublishingHouseApp
             void LoadStages(){cbStage.Items.Clear();foreach(DataRow r in DatabaseHelper.ExecuteQuery("SELECT ps.stage_id,ps.stage_name+' ('+p.title+')' AS lbl FROM PreparationStage ps JOIN Publication p ON p.publication_id=ps.publication_id ORDER BY ps.stage_name").Rows)cbStage.Items.Add(new ComboItem(Convert.ToInt32(r["stage_id"]),r["lbl"].ToString()));}
 
             AddSaveCancel(scroll,ref y,
-                onSave:()=>{if(string.IsNullOrWhiteSpace(tbResult.Text)||cbStage.SelectedItem==null){UIHelper.ShowError("Заполните все поля.");return;}if(dtpValid.Value.Date<=dtpDate.Value.Date){UIHelper.ShowError("Дата окончания должна быть позже даты экспертизы.");return;}int sid=((ComboItem)cbStage.SelectedItem).Id;var prm=new[]{new SqlParameter("@d",dtpDate.Value.Date),new SqlParameter("@r",tbResult.Text.Trim()),new SqlParameter("@v",dtpValid.Value.Date),new SqlParameter("@s",sid)};int res=eid==-1?DatabaseHelper.SmartInsert("Expertise","INSERT INTO Expertise (date,result,valid_until,stage_id) VALUES (@d,@r,@v,@s)",prm):DatabaseHelper.ExecuteNonQuery("UPDATE Expertise SET date=@d,result=@r,valid_until=@v,stage_id=@s WHERE expertise_id=@id",Append(prm,new SqlParameter("@id",eid)));if(res>=0){sb.Refresh();editPanel.Visible=false;}},
+                onSave:()=>{if(string.IsNullOrWhiteSpace(tbResult.Text)||cbStage.SelectedItem==null){UIHelper.ShowError("Заполните все поля.");return;}if(dtpValid.Value.Date<=dtpDate.Value.Date){UIHelper.ShowError("Дата окончания должна быть позже даты экспертизы.");return;}int sid=((ComboItem)cbStage.SelectedItem).Id;var prm=new[]{new SqlParameter("@d",dtpDate.Value.Date),new SqlParameter("@r",tbResult.Text.Trim()),new SqlParameter("@v",dtpValid.Value.Date),new SqlParameter("@s",sid)};int res=eid==-1?DatabaseHelper.SmartInsert("Expertise","INSERT INTO Expertise (date,result,valid_until,stage_id) VALUES (@d,@r,@v,@s)",prm):DatabaseHelper.ExecuteNonQuery("UPDATE Expertise SET date=@d,result=@r,valid_until=@v,stage_id=@s WHERE expertise_id=@id",Append(prm,new SqlParameter("@id",eid)));if(res>=0){sb.ReloadData();editPanel.Visible=false;}},
                 onCancel:()=>editPanel.Visible=false);
 
             scroll.Controls.Add(lblH); editPanel.Controls.Add(scroll);
             btnAdd.Click+=(s,e)=>{LoadStages();dtpDate.Value=DateTime.Today;tbResult.Text="";dtpValid.Value=DateTime.Today.AddYears(1);cbStage.SelectedIndex=-1;eid=-1;lblH.Text="Новая экспертиза";editPanel.Visible=true;};
             btnEdit.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите экспертизу.");return;}LoadStages();var r=grid.SelectedRows[0];eid=Convert.ToInt32(r.Cells["expertise_id"].Value);lblH.Text="Редактировать экспертизу";if(r.Cells["date"].Value!=DBNull.Value)dtpDate.Value=Convert.ToDateTime(r.Cells["date"].Value);tbResult.Text=r.Cells["result"].Value?.ToString();if(r.Cells["valid_until"].Value!=DBNull.Value)dtpValid.Value=Convert.ToDateTime(r.Cells["valid_until"].Value);SelectById(cbStage,r.Cells["stage_id"].Value);editPanel.Visible=true;};
-            btnDel.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите экспертизу.");return;}var r=grid.SelectedRows[0];if(!UIHelper.Confirm("Удалить экспертизу?"))return;int res=DatabaseHelper.ExecuteNonQuery("DELETE FROM Expertise WHERE expertise_id=@id",new[]{new SqlParameter("@id",Convert.ToInt32(r.Cells["expertise_id"].Value))});if(res>=0){sb.Refresh();editPanel.Visible=false;}};
+            btnDel.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите экспертизу.");return;}var r=grid.SelectedRows[0];if(!UIHelper.Confirm("Удалить экспертизу?"))return;int res=DatabaseHelper.ExecuteNonQuery("DELETE FROM Expertise WHERE expertise_id=@id",new[]{new SqlParameter("@id",Convert.ToInt32(r.Cells["expertise_id"].Value))});if(res>=0){sb.ReloadData();editPanel.Visible=false;}};
             WireDoubleClick(grid,btnEdit);
-            sb.Init(grid,(kw,sc)=>{var dt=DatabaseHelper.ExecuteQuery($"SELECT e.expertise_id,e.date,e.result,e.valid_until,ps.stage_name AS stage,e.stage_id FROM Expertise e JOIN PreparationStage ps ON ps.stage_id=e.stage_id WHERE e.result LIKE @k OR ps.stage_name LIKE @k ORDER BY {sc}",new[]{new SqlParameter("@k",$"%{kw}%")});HideCols(grid,"expertise_id","stage_id");SetHeaders(grid,new[]{("date","Дата"),("result","Результат"),("valid_until","Действует до"),("stage","Этап")});return dt;},new[]{"Дата","Результат"},new[]{"e.date","e.result"});
+            sb.Init(grid,
+            (kw, sc) => DatabaseHelper.ExecuteQuery($"SELECT e.expertise_id,e.date,e.result,e.valid_until,ps.stage_name AS stage,e.stage_id FROM Expertise e JOIN PreparationStage ps ON ps.stage_id=e.stage_id WHERE e.result LIKE @k OR ps.stage_name LIKE @k ORDER BY {sc}",new[]{new SqlParameter("@k",$"%{kw}%")}),
+            new[]{"Дата","Результат"},
+            new[]{"e.date","e.result"},
+            new[] { ("date","Дата"), ("result","Результат"), ("valid_until","Действует до"), ("stage","Этап") },
+            new[] { "expertise_id", "stage_id" });
         }
 
         // ══════════════════════════════════════════════════════════════════════
@@ -455,15 +462,20 @@ namespace PublishingHouseApp
             void LoadAll(){LoadFormatsToCombo(cbFormat);cbPub.Items.Clear();foreach(DataRow r in DatabaseHelper.ExecuteQuery("SELECT publication_id,title FROM Publication ORDER BY title").Rows)cbPub.Items.Add(new ComboItem(Convert.ToInt32(r["publication_id"]),r["title"].ToString()));}
 
             AddSaveCancel(scroll,ref y,
-                onSave:()=>{if(!int.TryParse(tbYear.Text,out int yr)||yr<1900||yr>2100){UIHelper.ShowError("Введите корректный год.");return;}if(!int.TryParse(tbQty.Text,out int qty)||qty<=0){UIHelper.ShowError("Количество должно быть > 0.");return;}if(cbFormat.SelectedItem==null||cbPub.SelectedItem==null){UIHelper.ShowError("Выберите формат и издание.");return;}int fid=((ComboItem)cbFormat.SelectedItem).Id,pid=((ComboItem)cbPub.SelectedItem).Id;var prm=new[]{new SqlParameter("@y",yr),new SqlParameter("@q",qty),new SqlParameter("@f",fid),new SqlParameter("@p",pid)};int res=eid==-1?DatabaseHelper.SmartInsert("PrintRun","INSERT INTO PrintRun (year,quantity,format_id,publication_id) VALUES (@y,@q,@f,@p)",prm):DatabaseHelper.ExecuteNonQuery("UPDATE PrintRun SET year=@y,quantity=@q,format_id=@f,publication_id=@p WHERE print_run_id=@id",Append(prm,new SqlParameter("@id",eid)));if(res>=0){sb.Refresh();editPanel.Visible=false;}},
+                onSave:()=>{if(!int.TryParse(tbYear.Text,out int yr)||yr<1900||yr>2100){UIHelper.ShowError("Введите корректный год.");return;}if(!int.TryParse(tbQty.Text,out int qty)||qty<=0){UIHelper.ShowError("Количество должно быть > 0.");return;}if(cbFormat.SelectedItem==null||cbPub.SelectedItem==null){UIHelper.ShowError("Выберите формат и издание.");return;}int fid=((ComboItem)cbFormat.SelectedItem).Id,pid=((ComboItem)cbPub.SelectedItem).Id;var prm=new[]{new SqlParameter("@y",yr),new SqlParameter("@q",qty),new SqlParameter("@f",fid),new SqlParameter("@p",pid)};int res=eid==-1?DatabaseHelper.SmartInsert("PrintRun","INSERT INTO PrintRun (year,quantity,format_id,publication_id) VALUES (@y,@q,@f,@p)",prm):DatabaseHelper.ExecuteNonQuery("UPDATE PrintRun SET year=@y,quantity=@q,format_id=@f,publication_id=@p WHERE print_run_id=@id",Append(prm,new SqlParameter("@id",eid)));if(res>=0){sb.ReloadData();editPanel.Visible=false;}},
                 onCancel:()=>editPanel.Visible=false);
 
             scroll.Controls.Add(lblH); editPanel.Controls.Add(scroll);
             btnAdd.Click+=(s,e)=>{LoadAll();tbYear.Text=DateTime.Now.Year.ToString();tbQty.Text="";cbFormat.SelectedIndex=cbPub.SelectedIndex=-1;eid=-1;lblH.Text="Новый тираж";editPanel.Visible=true;};
             btnEdit.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите тираж.");return;}LoadAll();var r=grid.SelectedRows[0];eid=Convert.ToInt32(r.Cells["print_run_id"].Value);lblH.Text="Редактировать тираж";tbYear.Text=r.Cells["year"].Value?.ToString();tbQty.Text=r.Cells["quantity"].Value?.ToString();SelectById(cbFormat,r.Cells["format_id"].Value);SelectById(cbPub,r.Cells["publication_id"].Value);editPanel.Visible=true;};
-            btnDel.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите тираж.");return;}var r=grid.SelectedRows[0];if(!UIHelper.Confirm("Удалить тираж?"))return;int res=DatabaseHelper.ExecuteNonQuery("DELETE FROM PrintRun WHERE print_run_id=@id",new[]{new SqlParameter("@id",Convert.ToInt32(r.Cells["print_run_id"].Value))});if(res>=0){sb.Refresh();editPanel.Visible=false;}};
+            btnDel.Click+=(s,e)=>{if(grid.SelectedRows.Count==0){UIHelper.ShowError("Выберите тираж.");return;}var r=grid.SelectedRows[0];if(!UIHelper.Confirm("Удалить тираж?"))return;int res=DatabaseHelper.ExecuteNonQuery("DELETE FROM PrintRun WHERE print_run_id=@id",new[]{new SqlParameter("@id",Convert.ToInt32(r.Cells["print_run_id"].Value))});if(res>=0){sb.ReloadData();editPanel.Visible=false;}};
             WireDoubleClick(grid,btnEdit);
-            sb.Init(grid,(kw,sc)=>{var dt=DatabaseHelper.ExecuteQuery($"SELECT pr.print_run_id,pr.year,pr.quantity,f.format_name,p.title AS publication,pr.format_id,pr.publication_id FROM PrintRun pr JOIN Format f ON f.format_id=pr.format_id JOIN Publication p ON p.publication_id=pr.publication_id WHERE p.title LIKE @k OR f.format_name LIKE @k ORDER BY {sc}",new[]{new SqlParameter("@k",$"%{kw}%")});HideCols(grid,"print_run_id","format_id","publication_id");SetHeaders(grid,new[]{("year","Год"),("quantity","Количество"),("format_name","Формат"),("publication","Издание")});return dt;},new[]{"Год","Количество","Издание"},new[]{"pr.year","pr.quantity","p.title"});
+            sb.Init(grid,
+            (kw, sc) => DatabaseHelper.ExecuteQuery($"SELECT pr.print_run_id,pr.year,pr.quantity,f.format_name,p.title AS publication,pr.format_id,pr.publication_id FROM PrintRun pr JOIN Format f ON f.format_id=pr.format_id JOIN Publication p ON p.publication_id=pr.publication_id WHERE p.title LIKE @k OR f.format_name LIKE @k ORDER BY {sc}",new[]{new SqlParameter("@k",$"%{kw}%")}),
+            new[]{"Год","Количество","Издание"},
+            new[]{"pr.year","pr.quantity","p.title"},
+            new[] { ("year","Год"), ("quantity","Количество"), ("format_name","Формат"), ("publication","Издание") },
+            new[] { "print_run_id", "format_id", "publication_id" });
         }
 
         // ══════════════════════════════════════════════════════════════════════

@@ -23,6 +23,15 @@ namespace PublishingHouseApp
         private Func<string, string, DataTable> _queryFunc; // (keyword, sortCol) => DataTable
         private string[]      _sortLabels;
         private string[]      _sortCols;
+        private DataTable     _fullData;    // полный набор данных без фильтрации
+        private string        _lastSort;    // последняя применённая сортировка
+        private (string col, string header)[] _headers;    // маппинг col → заголовок
+        private string[]      _hiddenCols;  // колонки которые нужно скрыть (ID и т.д.)
+
+        // Цвет подсветки совпадающих строк
+        private static readonly Color HighlightColor = Color.FromArgb(255, 243, 176); // жёлтый
+        private static readonly Color NormalColor    = Color.White;
+        private static readonly Color AltColor       = Color.FromArgb(245, 248, 250); // чередование
 
         public SectionSearchBar()
         {
@@ -37,17 +46,31 @@ namespace PublishingHouseApp
         public void Init(DataGridView grid,
                          Func<string, string, DataTable> queryFunc,
                          string[] sortLabels,
-                         string[] sortColumns)
+                         string[] sortColumns,
+                         (string col, string header)[] headers = null,
+                         string[] hiddenCols = null)
         {
             _targetGrid  = grid;
             _queryFunc   = queryFunc;
             _sortLabels  = sortLabels;
             _sortCols    = sortColumns;
+            _headers     = headers;
+            _hiddenCols  = hiddenCols;
 
             _cbSort.Items.Clear();
             _cbSort.Items.AddRange(sortLabels);
             _cbSort.SelectedIndex = 0;
 
+            _targetGrid.RowPrePaint -= OnRowPrePaint;
+            _targetGrid.RowPrePaint += OnRowPrePaint;
+
+            Refresh();
+        }
+
+        // ── Принудительно перезагрузить данные из БД (вызывается после CRUD) ──
+        public void ReloadData()
+        {
+            _fullData = null;  // сбрасываем кэш
             Refresh();
         }
 
@@ -159,7 +182,9 @@ namespace PublishingHouseApp
             Controls.Add(flow);
         }
 
-        // ── Refresh (execute search) ──────────────────────────────────────────
+        // ── Refresh ──────────────────────────────────────────────────────────
+        // Если поисковая строка пуста — показываем все записи (без подсветки).
+        // Если введено слово — показываем все записи, подсвечиваем совпадения.
         public new void Refresh()
         {
             if (_targetGrid == null || _queryFunc == null) return;
@@ -176,18 +201,120 @@ namespace PublishingHouseApp
 
                 _btnClear.Visible = !string.IsNullOrEmpty(keyword);
 
-                var dt = _queryFunc(keyword, sortCol);
-                _targetGrid.DataSource = dt;
+                // Перезагружаем из БД если нет кэша или сортировка изменилась
+                if (_fullData == null || _lastSort != sortCol)
+                {
+                    // Запрашиваем ВСЕ строки (пустой keyword = без фильтра)
+                    _fullData  = _queryFunc("", sortCol);
+                    _lastSort  = sortCol;
+                }
 
-                int count = dt?.Rows.Count ?? 0;
-                _lblCount.Text = count == 0
-                    ? "Нет записей"
-                    : $"{count} {Pluralize(count, "запись", "записи", "записей")}";
+                // Всегда показываем полный набор данных
+                _targetGrid.DataSource = _fullData;
+
+                // Применяем заголовки и скрываем служебные колонки
+                ApplyHeaders();
+
+                // Запоминаем ключевое слово для перекраски строк
+                _currentKeyword = keyword;
+
+                // Обновляем счётчик: если есть поиск — считаем совпадения
+                int total = _fullData?.Rows.Count ?? 0;
+                if (string.IsNullOrEmpty(keyword))
+                {
+                    _lblCount.Text = total == 0
+                        ? "Нет записей"
+                        : $"{total} {Pluralize(total, "запись", "записи", "записей")}";
+                }
+                else
+                {
+                    int matched = CountMatches(_fullData, keyword);
+                    _lblCount.Text = matched == 0
+                        ? "Совпадений нет"
+                        : $"{matched} из {total} совпадают";
+                }
+
+                // Перерисовываем строки с новой подсветкой
+                _targetGrid.Invalidate();
             }
             catch (Exception ex)
             {
                 UIHelper.ShowError($"Ошибка поиска:\n{ex.Message}");
             }
+        }
+
+        // ── Применить заголовки и скрыть служебные колонки ─────────────────
+        private void ApplyHeaders()
+        {
+            if (_targetGrid == null) return;
+
+            // Скрываем служебные колонки (ID и т.д.)
+            if (_hiddenCols != null)
+                foreach (var col in _hiddenCols)
+                    if (_targetGrid.Columns.Contains(col))
+                        _targetGrid.Columns[col].Visible = false;
+
+            // Устанавливаем русские заголовки
+            if (_headers != null)
+                foreach (var (col, hdr) in _headers)
+                    if (_targetGrid.Columns.Contains(col))
+                        _targetGrid.Columns[col].HeaderText = hdr;
+        }
+
+        // ── Текущее ключевое слово (используется при перекраске строк) ────────
+        private string _currentKeyword = "";
+
+        // ── Перекраска строк: совпадающие — жёлтым, остальные — белым ─────────
+        private void OnRowPrePaint(object sender, DataGridViewRowPrePaintEventArgs e)
+        {
+            try
+            {
+                if (_targetGrid == null || e.RowIndex < 0 ||
+                    e.RowIndex >= _targetGrid.Rows.Count) return;
+
+                var row = _targetGrid.Rows[e.RowIndex];
+
+                if (string.IsNullOrEmpty(_currentKeyword))
+                {
+                    // Нет поиска — обычное чередование строк
+                    row.DefaultCellStyle.BackColor = e.RowIndex % 2 == 0
+                        ? NormalColor : AltColor;
+                    return;
+                }
+
+                // Проверяем: хоть одна ячейка содержит ключевое слово?
+                bool match = RowContains(row, _currentKeyword);
+                row.DefaultCellStyle.BackColor = match ? HighlightColor : NormalColor;
+            }
+            catch { /* не критично */ }
+        }
+
+        private static bool RowContains(DataGridViewRow row, string keyword)
+        {
+            string kw = keyword.ToLowerInvariant();
+            foreach (DataGridViewCell cell in row.Cells)
+            {
+                if (!cell.Visible) continue;
+                string val = cell.Value?.ToString() ?? "";
+                if (val.ToLowerInvariant().Contains(kw)) return true;
+            }
+            return false;
+        }
+
+        private static int CountMatches(DataTable dt, string keyword)
+        {
+            if (dt == null || string.IsNullOrEmpty(keyword)) return 0;
+            string kw = keyword.ToLowerInvariant();
+            int count = 0;
+            foreach (DataRow row in dt.Rows)
+            {
+                foreach (DataColumn col in dt.Columns)
+                {
+                    string val = row[col]?.ToString() ?? "";
+                    if (val.ToLowerInvariant().Contains(kw)) { count++; break; }
+                }
+            }
+            return count;
         }
 
         private static string Pluralize(int n, string one, string few, string many)
