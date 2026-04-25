@@ -44,6 +44,36 @@ namespace PublishingHouseApp
 
             var sep = new Panel { BackColor = AppColors.PanelBorder, Size = new Size(900, 1), Location = new Point(24, 76) };
 
+            // ── Кнопка обновления ─────────────────────────────────────────────
+            var btnRefresh = new Button
+            {
+                Text      = "⟳  Обновить",
+                FlatStyle = FlatStyle.Flat,
+                BackColor = AppColors.ButtonPrimary,
+                ForeColor = Color.White,
+                Font      = new Font("Segoe UI", 9f),
+                Size      = new Size(110, 26),
+                Cursor    = Cursors.Hand,
+                Anchor    = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnRefresh.FlatAppearance.BorderSize = 0;
+            btnRefresh.MouseEnter += (s, e) => btnRefresh.BackColor = AppColors.ButtonPrimaryHover;
+            btnRefresh.MouseLeave += (s, e) => btnRefresh.BackColor = AppColors.ButtonPrimary;
+            btnRefresh.Click      += (s, e) =>
+            {
+                btnRefresh.Enabled = false;
+                btnRefresh.Text    = "Загрузка...";
+                try   { LoadData(); }
+                finally
+                {
+                    btnRefresh.Enabled = true;
+                    btnRefresh.Text    = "⟳  Обновить";
+                }
+            };
+            SizeChanged += (s, e) =>
+                btnRefresh.Location = new Point(Width - btnRefresh.Width - 24, 18);
+            btnRefresh.Location = new Point(900, 18);
+
             // ── Карточки статистики ───────────────────────────────────────────
             _cardsFlow = new FlowLayoutPanel
             {
@@ -85,6 +115,7 @@ namespace PublishingHouseApp
             Controls.Add(lblTitle);
             Controls.Add(lblSub);
             Controls.Add(sep);
+            Controls.Add(btnRefresh);
             Controls.Add(_cardsFlow);
             Controls.Add(lblContracts);
             Controls.Add(_contractsPanel);
