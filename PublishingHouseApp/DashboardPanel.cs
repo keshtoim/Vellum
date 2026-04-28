@@ -5,15 +5,14 @@ using System.Windows.Forms;
 
 namespace PublishingHouseApp
 {
-    /// <summary>
-    /// Панель «Главная» — общая статистика для всех ролей.
-    /// </summary>
+    // Главная страница (Dashboard) — отображается первой после входа в систему.
+    // Содержит карточки со статистикой и таблицу истекающих договоров.
     public class DashboardPanel : Panel
     {
         private readonly UserRole _role;
-        private FlowLayoutPanel _cardsFlow;
-        private Panel           _contractsPanel;
-        private DataGridView    _expiringGrid;
+        private FlowLayoutPanel  _cardsFlow;
+        private Panel            _contractsPanel;
+        private DataGridView     _expiringGrid;
 
         public DashboardPanel(UserRole role)
         {
@@ -24,15 +23,13 @@ namespace PublishingHouseApp
             Build();
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // BUILD
-        // ══════════════════════════════════════════════════════════════════════
+        // ── Построение интерфейса ─────────────────────────────────────────────
         private void Build()
         {
-            // ── Заголовок ─────────────────────────────────────────────────────
             var lblTitle = UIHelper.MakeSectionTitle("Главная");
             lblTitle.Location = new Point(24, 20);
 
+            // Приветствие с именем роли и текущей датой
             var lblSub = new Label
             {
                 Text      = $"Добро пожаловать, {AppUsers.GetRoleDisplayName(_role)}  •  {DateTime.Now:dd MMMM yyyy}",
@@ -61,6 +58,7 @@ namespace PublishingHouseApp
             btnRefresh.MouseLeave += (s, e) => btnRefresh.BackColor = AppColors.ButtonPrimary;
             btnRefresh.Click      += (s, e) =>
             {
+                // Блокируем кнопку на время загрузки чтобы избежать двойного нажатия
                 btnRefresh.Enabled = false;
                 btnRefresh.Text    = "Загрузка...";
                 try   { LoadData(); }
@@ -70,6 +68,7 @@ namespace PublishingHouseApp
                     btnRefresh.Text    = "⟳  Обновить";
                 }
             };
+            // Кнопка прижата к правому краю и следует за изменением размера окна
             SizeChanged += (s, e) =>
                 btnRefresh.Location = new Point(Width - btnRefresh.Width - 24, 18);
             btnRefresh.Location = new Point(900, 18);
@@ -104,12 +103,11 @@ namespace PublishingHouseApp
             };
             _contractsPanel.Controls.Add(_expiringGrid);
 
-            // Адаптируем размеры при ресайзе
+            // При изменении размера окна растягиваем карточки и таблицу
             SizeChanged += (s, e) =>
             {
-                _cardsFlow.Width      = Width - 48;
-                lblContracts.Width    = Width - 48;
-                _contractsPanel.Size  = new Size(Width - 48, Height - 270);
+                _cardsFlow.Width     = Width - 48;
+                _contractsPanel.Size = new Size(Width - 48, Height - 270);
             };
 
             Controls.Add(lblTitle);
@@ -123,9 +121,9 @@ namespace PublishingHouseApp
             LoadData();
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // LOAD
-        // ══════════════════════════════════════════════════════════════════════
+        // ── Загрузка данных ───────────────────────────────────────────────────
+        // Перезагружает все данные Dashboard из БД.
+        // Вызывается при открытии страницы и при нажатии кнопки «Обновить».
         public void LoadData()
         {
             try
@@ -140,38 +138,40 @@ namespace PublishingHouseApp
             }
         }
 
+        // Заполняет карточки статистики данными из БД
         private void LoadStatCards()
         {
-            // Пользователи (роли)
+            // Роли — фиксированное значение, всегда 3
             AddStatCard("Пользователи", "3", "роли в системе",
                 AppColors.NavSelected, "👤");
 
-            // Авторы
+            // Остальные значения берём из БД
             int authorsCount = GetScalarInt("SELECT COUNT(*) FROM Author");
             AddStatCard("Авторы", authorsCount.ToString(), "зарегистрировано",
                 Color.FromArgb(39, 174, 96), "✍");
 
-            // Договоры
             int contractsCount = GetScalarInt("SELECT COUNT(*) FROM Contract");
             AddStatCard("Договоры", contractsCount.ToString(), "всего договоров",
                 Color.FromArgb(142, 68, 173), "📄");
 
-            // Ближайший истекающий договор
+            // Ближайший истекающий договор — для предупреждения
             string nearestContract = GetNearestExpiringContract();
             AddStatCard("Ближайший договор", nearestContract, "истекает скорее всего",
                 Color.FromArgb(230, 126, 34), "⚠");
 
-            // Издания
             int pubCount = GetScalarInt("SELECT COUNT(*) FROM Publication");
             AddStatCard("Издания", pubCount.ToString(), "в базе",
                 Color.FromArgb(41, 128, 185), "📚");
 
-            // Тиражи — суммарный
+            // Суммарный тираж всех изданий
             int totalPrint = GetScalarInt("SELECT ISNULL(SUM(quantity),0) FROM PrintRun");
             AddStatCard("Суммарный тираж", totalPrint.ToString("N0"), "экз. всего",
                 Color.FromArgb(22, 160, 133), "🖨");
         }
 
+        // Загружает договоры, истекающие в ближайшие 30 дней.
+        // Строки подсвечиваются цветом в зависимости от срочности:
+        // красный < 7 дней, жёлтый < 14 дней, зелёный — остальные
         private void LoadExpiringContracts()
         {
             var dt = DatabaseHelper.ExecuteQuery(@"
@@ -191,13 +191,13 @@ namespace PublishingHouseApp
 
             _expiringGrid.DataSource = dt;
 
-            // Цветовая индикация по количеству дней
+            // Подписываемся на перекраску строк по срочности
             _expiringGrid.RowPrePaint -= OnRowPrePaint;
             _expiringGrid.RowPrePaint += OnRowPrePaint;
 
             if (dt.Rows.Count == 0)
             {
-                // Показываем сообщение что нет истекающих договоров
+                // Нет истекающих договоров — показываем зелёное сообщение
                 _expiringGrid.DataSource = null;
                 var emptyLabel = new Label
                 {
@@ -217,6 +217,7 @@ namespace PublishingHouseApp
             }
         }
 
+        // Перекрашивает строки таблицы по количеству оставшихся дней
         private void OnRowPrePaint(object sender, DataGridViewRowPrePaintEventArgs e)
         {
             try
@@ -228,20 +229,21 @@ namespace PublishingHouseApp
                 var val = row.Cells["Дней осталось"].Value;
                 if (val == null || val == DBNull.Value) return;
                 int days = Convert.ToInt32(val);
+
+                // Цвет строки зависит от срочности
                 if (days <= 7)
-                    row.DefaultCellStyle.BackColor = Color.FromArgb(253, 237, 236);  // красноватый
+                    row.DefaultCellStyle.BackColor = Color.FromArgb(253, 237, 236);  // красный
                 else if (days <= 14)
                     row.DefaultCellStyle.BackColor = Color.FromArgb(254, 249, 219);  // жёлтый
                 else
                     row.DefaultCellStyle.BackColor = Color.FromArgb(232, 246, 243);  // зелёный
             }
-            catch { /* не критично */ }
+            catch { /* некритичная ошибка перекраски */ }
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // HELPERS
-        // ══════════════════════════════════════════════════════════════════════
+        // ── Вспомогательные методы ────────────────────────────────────────────
 
+        // Добавляет карточку статистики на Dashboard
         private void AddStatCard(string title, string value, string subtitle,
                                   Color accentColor, string icon)
         {
@@ -250,12 +252,11 @@ namespace PublishingHouseApp
                 Size      = new Size(172, 90),
                 BackColor = Color.White,
                 Margin    = new Padding(0, 0, 12, 0),
-                Cursor    = Cursors.Default
             };
             card.Paint += (s, e) =>
                 e.Graphics.DrawRectangle(new Pen(AppColors.PanelBorder), 0, 0, card.Width - 1, card.Height - 1);
 
-            // Accent top bar
+            // Цветная полоска сверху — акцент карточки
             var topBar = new Panel
             {
                 BackColor = accentColor,
@@ -272,41 +273,41 @@ namespace PublishingHouseApp
                 TextAlign = ContentAlignment.MiddleCenter
             };
 
-            // Адаптивный размер шрифта — чем длиннее текст, тем меньше шрифт
+            // Адаптивный размер шрифта — чем длиннее значение, тем меньше шрифт
             float valueFontSize = value.Length <= 6  ? 18f :
                                   value.Length <= 12 ? 13f :
                                   value.Length <= 20 ? 10f : 8.5f;
 
             var lblValue = new Label
             {
-                Text      = value,
-                Font      = new Font("Segoe UI", valueFontSize, FontStyle.Bold),
-                ForeColor = accentColor,
-                Location  = new Point(10, 14),
-                Size      = new Size(card.Width - 50, 34),
-                AutoSize  = false,
-                AutoEllipsis = true
+                Text         = value,
+                Font         = new Font("Segoe UI", valueFontSize, FontStyle.Bold),
+                ForeColor    = accentColor,
+                Location     = new Point(10, 14),
+                Size         = new Size(card.Width - 50, 34),
+                AutoSize     = false,
+                AutoEllipsis = true   // обрезает текст с «...» если не влезает
             };
 
             var lblTitle = new Label
             {
-                Text      = title,
-                Font      = new Font("Segoe UI", 8.5f, FontStyle.Bold),
-                ForeColor = AppColors.TextPrimary,
-                Location  = new Point(10, 52),
-                Size      = new Size(card.Width - 16, 16),
-                AutoSize  = false,
+                Text         = title,
+                Font         = new Font("Segoe UI", 8.5f, FontStyle.Bold),
+                ForeColor    = AppColors.TextPrimary,
+                Location     = new Point(10, 52),
+                Size         = new Size(card.Width - 16, 16),
+                AutoSize     = false,
                 AutoEllipsis = true
             };
 
             var lblSub = new Label
             {
-                Text      = subtitle,
-                Font      = new Font("Segoe UI", 7.5f),
-                ForeColor = AppColors.TextSecondary,
-                Location  = new Point(10, 70),
-                Size      = new Size(card.Width - 16, 14),
-                AutoSize  = false,
+                Text         = subtitle,
+                Font         = new Font("Segoe UI", 7.5f),
+                ForeColor    = AppColors.TextSecondary,
+                Location     = new Point(10, 70),
+                Size         = new Size(card.Width - 16, 14),
+                AutoSize     = false,
                 AutoEllipsis = true
             };
 
@@ -319,6 +320,7 @@ namespace PublishingHouseApp
             _cardsFlow.Controls.Add(card);
         }
 
+        // Выполняет COUNT/SUM запрос и возвращает целое число (0 при ошибке)
         private static int GetScalarInt(string sql)
         {
             try
@@ -329,6 +331,7 @@ namespace PublishingHouseApp
             catch { return 0; }
         }
 
+        // Возвращает строку вида «Иванов И. (5 дн.)» для карточки «Ближайший договор»
         private static string GetNearestExpiringContract()
         {
             try
@@ -348,11 +351,13 @@ namespace PublishingHouseApp
                 string fio  = row["fio"].ToString();
                 var date = Convert.ToDateTime(row["valid_until"]);
                 int days = (date - DateTime.Today).Days;
-                // Укорачиваем ФИО до фамилии + инициалов если длинное
-                var parts = fio.Split(' ');
+
+                // Сокращаем ФИО до «Фамилия И.» чтобы влезало в карточку
+                var parts    = fio.Split(' ');
                 string shortFio = parts.Length >= 2
                     ? $"{parts[0]} {parts[1][0]}."
                     : fio;
+
                 return $"{shortFio} ({days} дн.)";
             }
             catch { return "ошибка"; }

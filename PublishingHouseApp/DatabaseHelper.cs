@@ -6,12 +6,17 @@ using System.Data.SqlClient;
 
 namespace PublishingHouseApp
 {
+    // Статический класс для работы с базой данных.
+    // Все запросы к БД проходят через этот класс — единая точка доступа к данным.
+    // Использует параметризованные запросы для защиты от SQL-инъекций.
     public static class DatabaseHelper
     {
+        // Строка подключения из App.config
         private static readonly string ConnectionString =
             ConfigurationManager.ConnectionStrings["PublishingDB"].ConnectionString;
 
-        // ── Таблицы и их первичные ключи (для ручного управления ID) ─────────
+        // ── Таблицы и их первичные ключи ──────────────────────────────────────
+        // Используется в SmartInsert для автоматического подбора ID
         private static readonly Dictionary<string, string> TablePrimaryKeys =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -27,14 +32,15 @@ namespace PublishingHouseApp
                 { "Class",            "class_id"        },
             };
 
+        // Создаёт новое соединение с БД (не открывает — только создаёт объект)
         public static SqlConnection GetConnection()
         {
             return new SqlConnection(ConnectionString);
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // SELECT
-        // ══════════════════════════════════════════════════════════════════════
+        // ── SELECT ────────────────────────────────────────────────────────────
+        // Выполняет SELECT-запрос и возвращает результат в виде DataTable.
+        // При ошибке показывает сообщение пользователю и возвращает пустую таблицу.
         public static DataTable ExecuteQuery(string sql, SqlParameter[] parameters = null)
         {
             var dt = new DataTable();
@@ -60,16 +66,9 @@ namespace PublishingHouseApp
             return dt;
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // INSERT / UPDATE / DELETE  — с автоматическим подбором ID
-        // ══════════════════════════════════════════════════════════════════════
-
-        /// <summary>
-        /// Выполняет INSERT/UPDATE/DELETE.
-        /// При ошибке нарушения IDENTITY / отсутствия автоинкремента
-        /// автоматически подбирает следующий свободный ID и повторяет запрос.
-        /// Возвращает количество затронутых строк, или -1 при ошибке.
-        /// </summary>
+        // ── INSERT / UPDATE / DELETE ───────────────────────────────────────────
+        // Выполняет модифицирующий запрос с обработкой типовых ошибок БД.
+        // Возвращает количество затронутых строк или -1 при ошибке.
         public static int ExecuteNonQuery(string sql, SqlParameter[] parameters = null,
                                            string tableName = null)
         {
@@ -79,22 +78,23 @@ namespace PublishingHouseApp
             }
             catch (SqlException ex) when (IsIdentityError(ex))
             {
-                // Ошибка автоинкремента — пробуем подобрать ID вручную
+                // Ошибка автоинкремента — пробуем вставить с ручным ID
                 if (tableName != null && IsInsertStatement(sql))
-                {
                     return RetryInsertWithManualId(sql, parameters, tableName);
-                }
+
                 UIHelper.ShowError($"Ошибка вставки записи:\n{ex.Message}");
                 return -1;
             }
-            catch (SqlException ex) when (ex.Number == 547) // FK violation
+            catch (SqlException ex) when (ex.Number == 547)
             {
+                // Нарушение внешнего ключа — нельзя удалить/изменить запись со связями
                 UIHelper.ShowError("Невозможно выполнить операцию: существуют связанные записи.\n" +
                                    "Сначала удалите зависимые данные.");
                 return -1;
             }
-            catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601) // unique
+            catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601)
             {
+                // Нарушение уникальности — такая запись уже существует
                 UIHelper.ShowError("Запись с такими данными уже существует.");
                 return -1;
             }
@@ -110,6 +110,7 @@ namespace PublishingHouseApp
             }
         }
 
+        // Выполняет скалярный запрос (например COUNT или MAX) и возвращает одно значение
         public static object ExecuteScalar(string sql, SqlParameter[] parameters = null)
         {
             try
@@ -134,23 +135,19 @@ namespace PublishingHouseApp
             }
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // SMART INSERT — подбирает следующий свободный ID
-        // ══════════════════════════════════════════════════════════════════════
-
-        /// <summary>
-        /// Универсальный INSERT с автоматическим определением следующего ID.
-        /// Используй вместо ExecuteNonQuery для INSERT-запросов.
-        /// </summary>
+        // ── SMART INSERT ──────────────────────────────────────────────────────
+        // Умная вставка: сначала пробует обычный INSERT.
+        // Если в таблице не настроен автоинкремент (IDENTITY) — автоматически
+        // определяет следующий свободный ID через MAX(pk)+1 и повторяет запрос.
         public static int SmartInsert(string tableName, string sql, SqlParameter[] parameters)
         {
-            // Сначала пробуем как есть (если IDENTITY настроен)
             try
             {
                 return RunNonQuery(sql, parameters);
             }
             catch (SqlException ex) when (IsIdentityError(ex))
             {
+                // Автоинкремент не настроен — подбираем ID вручную
                 return RetryInsertWithManualId(sql, parameters, tableName);
             }
             catch (SqlException ex) when (ex.Number == 547)
@@ -175,112 +172,8 @@ namespace PublishingHouseApp
             }
         }
 
-        // ══════════════════════════════════════════════════════════════════════
-        // PRIVATE HELPERS
-        // ══════════════════════════════════════════════════════════════════════
-
-        private static int RunNonQuery(string sql, SqlParameter[] parameters)
-        {
-            using (var conn = GetConnection())
-            using (var cmd  = new SqlCommand(sql, conn))
-            {
-                if (parameters != null) cmd.Parameters.AddRange(parameters);
-                conn.Open();
-                return cmd.ExecuteNonQuery();
-            }
-        }
-
-        private static int RetryInsertWithManualId(string sql, SqlParameter[] parameters,
-                                                     string tableName)
-        {
-            try
-            {
-                if (!TablePrimaryKeys.TryGetValue(tableName, out string pkCol))
-                {
-                    UIHelper.ShowError($"Не удалось определить первичный ключ таблицы {tableName}.");
-                    return -1;
-                }
-
-                // Получаем следующий свободный ID
-                int nextId = GetNextId(tableName, pkCol);
-
-                // Добавляем параметр ID в запрос
-                string modifiedSql = InjectIdIntoSql(sql, tableName, pkCol, nextId);
-
-                var newParams = new SqlParameter[
-                    (parameters?.Length ?? 0) + 1];
-                parameters?.CopyTo(newParams, 0);
-                newParams[newParams.Length - 1] = new SqlParameter($"@{pkCol}", nextId);
-
-                return RunNonQuery(modifiedSql, newParams);
-            }
-            catch (Exception ex)
-            {
-                UIHelper.ShowError($"Ошибка при повторной вставке с ручным ID:\n{ex.Message}");
-                return -1;
-            }
-        }
-
-        /// <summary>
-        /// Возвращает MAX(pk) + 1 для таблицы, или 1 если таблица пустая
-        /// </summary>
-        public static int GetNextId(string tableName, string pkColumn)
-        {
-            try
-            {
-                var result = ExecuteScalar(
-                    $"SELECT ISNULL(MAX({pkColumn}), 0) + 1 FROM {tableName}");
-                return result != null ? Convert.ToInt32(result) : 1;
-            }
-            catch
-            {
-                return 1;
-            }
-        }
-
-        /// <summary>
-        /// Модифицирует INSERT-запрос, добавляя в него колонку ID и параметр
-        /// Пример: INSERT INTO Author (surname,...) VALUES (@s,...)
-        ///      → INSERT INTO Author (author_id,surname,...) VALUES (@author_id,@s,...)
-        /// </summary>
-        private static string InjectIdIntoSql(string sql, string tableName,
-                                               string pkCol, int id)
-        {
-            // Ищем паттерн: INSERT INTO TableName (cols) VALUES (vals)
-            int colsStart = sql.IndexOf('(');
-            int colsEnd   = sql.IndexOf(')');
-            int valsStart = sql.LastIndexOf('(');
-            int valsEnd   = sql.LastIndexOf(')');
-
-            if (colsStart < 0 || valsStart <= colsEnd)
-                return sql; // не можем распарсить — возвращаем как есть
-
-            string colsPart = sql.Substring(colsStart + 1, colsEnd - colsStart - 1).Trim();
-            string valsPart = sql.Substring(valsStart + 1, valsEnd - valsStart - 1).Trim();
-
-            string newCols = $"{pkCol},{colsPart}";
-            string newVals = $"@{pkCol},{valsPart}";
-
-            return sql.Substring(0, colsStart) +
-                   $"({newCols}) VALUES ({newVals})";
-        }
-
-        private static bool IsIdentityError(SqlException ex)
-        {
-            // 544 = Cannot insert explicit value for identity column
-            // 8101 = An explicit value for the identity column can only be specified...
-            // 515 = Cannot insert NULL into column (когда нет IDENTITY и не передан ID)
-            return ex.Number == 544 || ex.Number == 8101 || ex.Number == 515;
-        }
-
-        private static bool IsInsertStatement(string sql)
-        {
-            return sql.TrimStart().StartsWith("INSERT", StringComparison.OrdinalIgnoreCase);
-        }
-
-        // ══════════════════════════════════════════════════════════════════════
-        // CONNECTION TEST
-        // ══════════════════════════════════════════════════════════════════════
+        // ── ПРОВЕРКА СОЕДИНЕНИЯ ───────────────────────────────────────────────
+        // Вызывается при старте приложения — предупреждает если БД недоступна
         public static bool TestConnection()
         {
             try
@@ -295,6 +188,97 @@ namespace PublishingHouseApp
             {
                 return false;
             }
+        }
+
+        // Возвращает MAX(pkColumn)+1 для таблицы — следующий свободный ID
+        public static int GetNextId(string tableName, string pkColumn)
+        {
+            try
+            {
+                var result = ExecuteScalar(
+                    $"SELECT ISNULL(MAX({pkColumn}), 0) + 1 FROM {tableName}");
+                return result != null ? Convert.ToInt32(result) : 1;
+            }
+            catch
+            {
+                return 1;
+            }
+        }
+
+        // ── PRIVATE HELPERS ───────────────────────────────────────────────────
+
+        // Базовое выполнение команды без дополнительной обработки ошибок
+        private static int RunNonQuery(string sql, SqlParameter[] parameters)
+        {
+            using (var conn = GetConnection())
+            using (var cmd  = new SqlCommand(sql, conn))
+            {
+                if (parameters != null) cmd.Parameters.AddRange(parameters);
+                conn.Open();
+                return cmd.ExecuteNonQuery();
+            }
+        }
+
+        // Повтор INSERT с явным ID: модифицирует SQL добавляя колонку pk и параметр
+        private static int RetryInsertWithManualId(string sql, SqlParameter[] parameters,
+                                                     string tableName)
+        {
+            try
+            {
+                if (!TablePrimaryKeys.TryGetValue(tableName, out string pkCol))
+                {
+                    UIHelper.ShowError($"Не удалось определить первичный ключ таблицы {tableName}.");
+                    return -1;
+                }
+
+                int nextId = GetNextId(tableName, pkCol);
+
+                // Вставляем имя колонки pk и параметр @pk в SQL-запрос
+                string modifiedSql = InjectIdIntoSql(sql, tableName, pkCol, nextId);
+
+                var newParams = new SqlParameter[(parameters?.Length ?? 0) + 1];
+                parameters?.CopyTo(newParams, 0);
+                newParams[newParams.Length - 1] = new SqlParameter($"@{pkCol}", nextId);
+
+                return RunNonQuery(modifiedSql, newParams);
+            }
+            catch (Exception ex)
+            {
+                UIHelper.ShowError($"Ошибка при повторной вставке с ручным ID:\n{ex.Message}");
+                return -1;
+            }
+        }
+
+        // Добавляет колонку pk и параметр @pk в существующий INSERT-запрос
+        private static string InjectIdIntoSql(string sql, string tableName,
+                                               string pkCol, int id)
+        {
+            int colsStart = sql.IndexOf('(');
+            int colsEnd   = sql.IndexOf(')');
+            int valsStart = sql.LastIndexOf('(');
+            int valsEnd   = sql.LastIndexOf(')');
+
+            if (colsStart < 0 || valsStart <= colsEnd)
+                return sql;
+
+            string colsPart = sql.Substring(colsStart + 1, colsEnd - colsStart - 1).Trim();
+            string valsPart = sql.Substring(valsStart + 1, valsEnd - valsStart - 1).Trim();
+
+            return sql.Substring(0, colsStart) +
+                   $"({pkCol},{colsPart}) VALUES (@{pkCol},{valsPart})";
+        }
+
+        // Коды ошибок SQL Server связанных с автоинкрементом:
+        // 544 — нельзя вставить явное значение в IDENTITY-колонку
+        // 515 — нельзя вставить NULL (когда нет IDENTITY и ID не передан)
+        private static bool IsIdentityError(SqlException ex)
+        {
+            return ex.Number == 544 || ex.Number == 8101 || ex.Number == 515;
+        }
+
+        private static bool IsInsertStatement(string sql)
+        {
+            return sql.TrimStart().StartsWith("INSERT", StringComparison.OrdinalIgnoreCase);
         }
     }
 }

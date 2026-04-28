@@ -3,13 +3,14 @@ using System.Windows.Forms;
 
 namespace PublishingHouseApp
 {
-    /// <summary>
-    /// Фабрика стандартных UI-элементов в едином стиле приложения
-    /// </summary>
+    // Фабрика стандартных UI-элементов в едином стиле приложения.
+    // Все кнопки, таблицы и поля ввода создаются через этот класс —
+    // так оформление остаётся одинаковым во всём приложении.
     public static class UIHelper
     {
         // ── Кнопки ───────────────────────────────────────────────────────────
 
+        // Синяя кнопка для основных действий (Добавить, Сохранить, Войти)
         public static Button MakePrimaryButton(string text, int width = 130, int height = 34)
         {
             var btn = new Button
@@ -24,11 +25,13 @@ namespace PublishingHouseApp
                 Cursor    = Cursors.Hand
             };
             btn.FlatAppearance.BorderSize = 0;
+            // Эффект подсветки при наведении мыши
             btn.MouseEnter += (s, e) => btn.BackColor = AppColors.ButtonPrimaryHover;
             btn.MouseLeave += (s, e) => btn.BackColor = AppColors.ButtonPrimary;
             return btn;
         }
 
+        // Красная кнопка для деструктивных действий (Удалить)
         public static Button MakeDangerButton(string text, int width = 130, int height = 34)
         {
             var btn = new Button
@@ -50,36 +53,37 @@ namespace PublishingHouseApp
 
         // ── DataGridView ──────────────────────────────────────────────────────
 
+        // Таблица в едином стиле: тёмный заголовок, чередование строк, без лишних границ
         public static DataGridView MakeGrid()
         {
             var grid = new DataGridView
             {
                 Dock                  = DockStyle.Fill,
-                ReadOnly              = true,
+                ReadOnly              = true,         // редактирование через панель справа
                 AllowUserToAddRows    = false,
                 AllowUserToDeleteRows = false,
                 AutoSizeColumnsMode   = DataGridViewAutoSizeColumnsMode.Fill,
                 SelectionMode         = DataGridViewSelectionMode.FullRowSelect,
-                MultiSelect           = false,
+                MultiSelect           = false,        // одна строка за раз
                 BorderStyle           = BorderStyle.None,
                 BackgroundColor       = AppColors.PanelBackground,
                 GridColor             = AppColors.PanelBorder,
                 Font                  = new Font("Segoe UI", 9f),
-                RowHeadersVisible     = false,
-                EnableHeadersVisualStyles = false
+                RowHeadersVisible     = false,        // убираем нумерацию строк
+                EnableHeadersVisualStyles = false     // применяем свои стили заголовка
             };
 
-            // Заголовок
+            // Оформление заголовка таблицы
             grid.ColumnHeadersDefaultCellStyle.BackColor  = AppColors.GridHeader;
             grid.ColumnHeadersDefaultCellStyle.ForeColor  = AppColors.GridHeaderText;
             grid.ColumnHeadersDefaultCellStyle.Font       = new Font("Segoe UI", 9.5f, FontStyle.Bold);
             grid.ColumnHeadersDefaultCellStyle.Alignment  = DataGridViewContentAlignment.MiddleLeft;
             grid.ColumnHeadersHeight = 36;
 
-            // Чередование строк
+            // Чередование цвета строк для удобства чтения
             grid.AlternatingRowsDefaultCellStyle.BackColor = AppColors.GridRowAlt;
 
-            // Выделение
+            // Цвет выделенной строки — голубой вместо системного синего
             grid.DefaultCellStyle.SelectionBackColor = AppColors.GridSelection;
             grid.DefaultCellStyle.SelectionForeColor = AppColors.TextPrimary;
 
@@ -88,6 +92,7 @@ namespace PublishingHouseApp
 
         // ── Labels ────────────────────────────────────────────────────────────
 
+        // Крупный заголовок раздела (например «Управление авторами»)
         public static Label MakeSectionTitle(string text)
         {
             return new Label
@@ -99,6 +104,7 @@ namespace PublishingHouseApp
             };
         }
 
+        // Обычная подпись для полей ввода
         public static Label MakeLabel(string text)
         {
             return new Label
@@ -112,6 +118,7 @@ namespace PublishingHouseApp
 
         // ── TextBox ───────────────────────────────────────────────────────────
 
+        // Поле ввода; параметр password=true делает маску для пароля
         public static TextBox MakeTextBox(int width = 220, bool password = false)
         {
             var tb = new TextBox
@@ -127,20 +134,9 @@ namespace PublishingHouseApp
             return tb;
         }
 
-        // ── Panel helpers ─────────────────────────────────────────────────────
+        // ── Диалоговые окна ───────────────────────────────────────────────────
 
-        public static Panel MakeContentPanel()
-        {
-            return new Panel
-            {
-                Dock      = DockStyle.Fill,
-                BackColor = AppColors.PanelBackground,
-                Padding   = new Padding(16)
-            };
-        }
-
-        // ── Confirm dialog ────────────────────────────────────────────────────
-
+        // Диалог подтверждения действия — возвращает true если пользователь нажал «Да»
         public static bool Confirm(string message, string title = "Подтверждение")
         {
             return MessageBox.Show(message, title,
@@ -148,12 +144,14 @@ namespace PublishingHouseApp
                 MessageBoxIcon.Question) == DialogResult.Yes;
         }
 
+        // Окно с сообщением об ошибке
         public static void ShowError(string message)
         {
             MessageBox.Show(message, "Ошибка",
                 MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
+        // Информационное окно
         public static void ShowInfo(string message)
         {
             MessageBox.Show(message, "Информация",

@@ -1,11 +1,14 @@
 namespace PublishingHouseApp
 {
-    /// <summary>
-    /// Элемент выпадающего списка с числовым ID и отображаемым текстом
-    /// </summary>
+    // Элемент выпадающего списка (ComboBox).
+    // Хранит числовой ID записи из БД и отображаемый текст.
+    // ToString() возвращает Text — именно это видит пользователь в списке.
     public class ComboItem
     {
+        // Первичный ключ записи в БД (используется при сохранении)
         public int    Id   { get; }
+
+        // Текст который видит пользователь в выпадающем списке
         public string Text { get; }
 
         public ComboItem(int id, string text)
@@ -14,6 +17,7 @@ namespace PublishingHouseApp
             Text = text;
         }
 
+        // ComboBox вызывает ToString() для отображения — возвращаем человекочитаемый текст
         public override string ToString() => Text;
     }
 }
